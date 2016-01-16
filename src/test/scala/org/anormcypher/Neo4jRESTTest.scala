@@ -1,14 +1,7 @@
-package org.anormcyphertest
+package org.anormcypher
 
-import org.scalatest._
-import org.anormcypher._
-import scala.collection.JavaConverters._
-
-class Neo4jRESTSpec extends FlatSpec with Matchers with BeforeAndAfterEach {
-
-  implicit val connection = Neo4jREST(scala.util.Properties.envOrElse("NEO4J_SERVER", "localhost"))
-
-  override def beforeEach() {
+class Neo4jRESTSpec extends BaseAnormCypherSpec {
+  override def beforeEach = {
     Cypher("""
       CREATE (n {anormcyphername:'n'}),
       (n2 {anormcyphername:'n2'}),
@@ -19,14 +12,14 @@ class Neo4jRESTSpec extends FlatSpec with Matchers with BeforeAndAfterEach {
     Cypher("""
       CREATE (n5 {anormcyphername:'n5'}), 
         (n6 {anormcyphername:'n6'}), 
-        n5-[:test {name:'r', i:1, arr:[1,2,3], arrc:["a","b","c"]}]->n6;
+        n5-[:test {name:'r', i:1, arr:[1,2,3], arrc:["a","b","c"], arrb:[false, false, true, false]}]->n6;
       """)()
     Cypher("""
-      CREATE (n7 {anormcyphername:'nprops', i:1, arr:[1,2,3], arrc:['a','b','c']});
+      CREATE (n7 {anormcyphername:'nprops', i:1, arr:[1,2,3], arrc:['a','b','c'], arrb:[false, false, true, false]});
       """)()
   }
 
-  override def afterEach() {
+  override def afterEach = {
     Cypher("match (n) where has(n.anormcyphername) optional match (n)-[r]-() DELETE n,r;")()
   }
 
@@ -40,6 +33,18 @@ class Neo4jRESTSpec extends FlatSpec with Matchers with BeforeAndAfterEach {
     node.props("i") should equal (1)
     node.props("arr").asInstanceOf[Seq[Int]] should equal (Vector(1,2,3))
     node.props("arrc").asInstanceOf[Seq[String]] should equal (Vector("a","b","c"))
+    node.props("arrb").asInstanceOf[Seq[Boolean]] should equal (Vector(false, false, true, false))
+  }
+
+  it should "be able to retrieve array properties in projection" in {
+    val results = Cypher("""
+    | START n=node(*) where n.anormcyphername = 'nprops'
+    | RETURN n.arr as arr, n.arrc as arrc, n.arrb as arrb;""".stripMargin)()
+    results.size shouldBe 1
+    val row = results(0)
+    row[Seq[Int]]("arr") shouldBe Seq(1,2,3)
+    row[Seq[String]]("arrc") shouldBe Seq("a", "b", "c")
+    row[Seq[Boolean]]("arrb") shouldBe Seq(false, false, true, false)
   }
 
   it should "be able to retrieve collections of nodes" in {
@@ -69,6 +74,7 @@ class Neo4jRESTSpec extends FlatSpec with Matchers with BeforeAndAfterEach {
     rel.props("i") should equal (1)
     rel.props("arr").asInstanceOf[Seq[Int]] should equal (Vector(1,2,3))
     rel.props("arrc").asInstanceOf[Seq[String]] should equal (Vector("a","b","c"))
+    rel.props("arrb").asInstanceOf[Seq[Boolean]] should equal (Vector(false, false, true, false))
   }
 
   it should "be able to retrieve collections of relationships" in {
